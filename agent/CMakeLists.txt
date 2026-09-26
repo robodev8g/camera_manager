@@ -1,4 +1,4 @@
-find_package(OpenCV 4 REQUIRED COMPONENTS core imgcodecs videoio)
+find_package(OpenCV 4 REQUIRED COMPONENTS core highgui imgcodecs videoio)
 find_package(Threads REQUIRED)
 
 add_library(camera_agent_backend
@@ -34,6 +34,8 @@ target_compile_options(camera_agent_backend
 add_executable(camera-agent
     src/main.cpp
     src/agent_config.cpp
+    src/camera_controller.cpp
+    src/local_cli.cpp
     src/udp_agent_server.cpp
 )
 target_link_libraries(camera-agent PRIVATE camera_agent::backend)

@@ -1,11 +1,16 @@
 #include "camera_agent/opencv_camera_backend.hpp"
 
+#include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 
 #include <arpa/inet.h>
 
 #include <chrono>
+#include <cstdlib>
+#include <exception>
 #include <filesystem>
+#include <future>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -98,6 +103,7 @@ OpenCvCameraBackend::OpenCvCameraBackend(OpenCvCameraConfig config)
 }
 
 OpenCvCameraBackend::~OpenCvCameraBackend() {
+    stop_local_preview_noexcept();
     capture_thread_.request_stop();
     if (capture_thread_.joinable()) {
         capture_thread_.join();
@@ -189,6 +195,102 @@ void OpenCvCameraBackend::stop_live_stream() {
                           "No live stream is active");
     }
     streamer_.release();
+}
+
+void OpenCvCameraBackend::start_local_preview() {
+    std::scoped_lock preview_lock(preview_mutex_);
+    ensure_running();
+    if (preview_thread_.joinable()) {
+        throw CameraError(CameraErrorCode::conflict,
+                          "A local preview is already active");
+    }
+
+#if defined(__linux__)
+    const char* display = std::getenv("DISPLAY");
+    const char* wayland_display = std::getenv("WAYLAND_DISPLAY");
+    if ((display == nullptr || display[0] == '\0') &&
+        (wayland_display == nullptr || wayland_display[0] == '\0')) {
+        throw CameraError(CameraErrorCode::device_unavailable,
+                          "Local preview requires a graphical display");
+    }
+#endif
+
+    auto ready = std::make_shared<std::promise<void>>();
+    auto started = ready->get_future();
+    preview_thread_ = std::jthread(
+        [this, ready](std::stop_token token) { preview_loop(token, ready); });
+    try {
+        started.get();
+    } catch (const std::exception& error) {
+        preview_thread_.request_stop();
+        preview_thread_.join();
+        throw CameraError(CameraErrorCode::io_error,
+                          "Cannot start local preview: " +
+                              std::string(error.what()));
+    }
+}
+
+void OpenCvCameraBackend::stop_local_preview() {
+    std::scoped_lock preview_lock(preview_mutex_);
+    if (!preview_thread_.joinable()) {
+        throw CameraError(CameraErrorCode::conflict,
+                          "No local preview is active");
+    }
+    preview_thread_.request_stop();
+    preview_thread_.join();
+}
+
+void OpenCvCameraBackend::preview_loop(
+    std::stop_token stop_token,
+    const std::shared_ptr<std::promise<void>>& ready) noexcept {
+    constexpr const char* window_name = "Camera Agent Preview";
+    bool window_created = false;
+    bool startup_reported = false;
+    try {
+        cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
+        window_created = true;
+        ready->set_value();
+        startup_reported = true;
+
+        while (!stop_token.stop_requested() && !capture_failed_.load()) {
+            cv::Mat frame;
+            {
+                std::scoped_lock lock(mutex_);
+                latest_frame_.copyTo(frame);
+            }
+            if (!frame.empty()) {
+                cv::imshow(window_name, frame);
+            }
+            static_cast<void>(cv::waitKey(15));
+        }
+    } catch (...) {
+        if (!startup_reported) {
+            try {
+                ready->set_exception(std::current_exception());
+                startup_reported = true;
+            } catch (...) {
+            }
+        }
+    }
+
+    if (window_created) {
+        try {
+            cv::destroyWindow(window_name);
+            static_cast<void>(cv::waitKey(1));
+        } catch (...) {
+        }
+    }
+}
+
+void OpenCvCameraBackend::stop_local_preview_noexcept() noexcept {
+    try {
+        std::scoped_lock preview_lock(preview_mutex_);
+        if (preview_thread_.joinable()) {
+            preview_thread_.request_stop();
+            preview_thread_.join();
+        }
+    } catch (...) {
+    }
 }
 
 void OpenCvCameraBackend::capture_loop(std::stop_token stop_token) {

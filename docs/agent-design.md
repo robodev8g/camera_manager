@@ -62,8 +62,7 @@ Owns the minimal control plane. It:
 - binds the configured command port;
 - sends periodic heartbeats to `client_host`;
 - accepts commands only from that configured IPv4 address;
-- generates photo/video filenames under `media_directory`;
-- calls `ICameraBackend` serially;
+- forwards commands to the shared `CameraController`;
 - reports success or errors to the GUI.
 
 Supported messages are intentionally fixed:
@@ -82,6 +81,18 @@ encryption, guaranteed delivery, or durable operations. It is suitable only for
 the trusted-LAN prototype. A later gRPC service can replace this class without
 changing the camera backend.
 
+### `CameraController` and local CLI
+
+`CameraController` owns the recording, network-streaming, and local-preview
+state shared by all command sources. It serializes backend operations and
+generates photo/video filenames under `media_directory`. Both `UdpAgentServer`
+and the optional interactive CLI call this controller, so they cannot disagree
+about which outputs are active.
+
+Run the agent with `--interactive` to enable local commands for photos,
+recording, status, and an OpenCV HighGUI preview. The preview reuses the latest
+frame from the existing capture thread; it never opens the camera a second time.
+
 ### `ICameraBackend`
 
 The interface contains only the operations used by the server:
@@ -97,6 +108,8 @@ public:
     virtual void stop_recording() = 0;
     virtual void start_live_stream(const LiveStreamTarget&) = 0;
     virtual void stop_live_stream() = 0;
+    virtual void start_local_preview() = 0;
+    virtual void stop_local_preview() = 0;
 };
 ```
 
@@ -107,6 +120,9 @@ Owns one `cv::VideoCapture` and one capture thread. Each captured frame:
 - replaces the latest frame used for photos;
 - is written to a local `cv::VideoWriter` when recording;
 - is written to an OpenCV/GStreamer RTP output when streaming.
+
+An optional preview worker copies the latest frame and owns all `imshow`,
+`waitKey`, and window-destruction calls.
 
 This allows photo, recording, and streaming requests without opening the camera
 more than once. It encodes recording and live video separately; sharing one
@@ -151,8 +167,9 @@ GUI embedded view <- H.264/RTP/UDP <- OpenCvCameraBackend
 - One agent instance owns one camera.
 - One capture thread distributes frames to all active outputs.
 - Configuration uses `key=value`, not a configuration framework.
-- `UdpAgentServer` handles transport; `OpenCvCameraBackend` handles media;
-  `V4L2Controls` handles device controls.
+- `UdpAgentServer` and `LocalCli` handle command input; `CameraController`
+  coordinates shared state; `OpenCvCameraBackend` handles media; `V4L2Controls`
+  handles device controls.
 - The server depends on `ICameraBackend`, allowing a future fake or hardware
   backend without changing the protocol code.
 - There is no actor framework, message bus, database, plugin loader, RTSP server,
@@ -165,13 +182,17 @@ agent/
   include/camera_agent/
     agent_config.hpp
     camera_backend.hpp
+    camera_controller.hpp
     camera_types.hpp
+    local_cli.hpp
     opencv_camera_backend.hpp
     udp_agent_server.hpp
     v4l2_controls.hpp
   src/
     main.cpp
     agent_config.cpp
+    camera_controller.cpp
+    local_cli.cpp
     udp_agent_server.cpp
     backends/opencv_camera_backend.cpp
     backends/v4l2_controls.cpp
@@ -182,4 +203,3 @@ client/
 config/
   agent.conf.example
 ```
-

@@ -8,6 +8,8 @@
 
 #include <atomic>
 #include <filesystem>
+#include <future>
+#include <memory>
 #include <mutex>
 #include <stop_token>
 #include <string>
@@ -40,9 +42,14 @@ public:
     void stop_recording() override;
     void start_live_stream(const LiveStreamTarget& target) override;
     void stop_live_stream() override;
+    void start_local_preview() override;
+    void stop_local_preview() override;
 
 private:
     void capture_loop(std::stop_token stop_token);
+    void preview_loop(std::stop_token stop_token,
+                      const std::shared_ptr<std::promise<void>>& ready) noexcept;
+    void stop_local_preview_noexcept() noexcept;
     void ensure_running() const;
 
     OpenCvCameraConfig config_;
@@ -54,6 +61,8 @@ private:
     cv::VideoWriter streamer_;
     mutable std::mutex mutex_;
     std::jthread capture_thread_;
+    std::mutex preview_mutex_;
+    std::jthread preview_thread_;
     std::atomic_bool capture_failed_{false};
 };
 

@@ -8,11 +8,7 @@
 #include <unistd.h>
 
 #include <array>
-#include <chrono>
 #include <cstring>
-#include <ctime>
-#include <iomanip>
-#include <sstream>
 #include <string>
 #include <thread>
 #include <utility>
@@ -34,11 +30,11 @@ namespace {
 
 }  // namespace
 
-UdpAgentServer::UdpAgentServer(AgentConfig config, ICameraBackend& camera)
-    : config_(std::move(config)), camera_(camera) {
+UdpAgentServer::UdpAgentServer(AgentConfig config,
+                               CameraController& controller)
+    : config_(std::move(config)), controller_(controller) {
     client_address_ =
         endpoint(config_.client_host, config_.heartbeat_port).sin_addr.s_addr;
-    std::filesystem::create_directories(config_.media_directory);
 
     socket_ = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (socket_ < 0) {
@@ -66,7 +62,6 @@ UdpAgentServer::UdpAgentServer(AgentConfig config, ICameraBackend& camera)
 }
 
 UdpAgentServer::~UdpAgentServer() {
-    stop_outputs();
     if (socket_ >= 0) {
         ::close(socket_);
     }
@@ -111,100 +106,54 @@ void UdpAgentServer::run(const volatile std::sig_atomic_t& keep_running) {
     }
 
     heartbeat.request_stop();
-    stop_outputs();
+    controller_.stop_outputs();
     send_heartbeat("OFFLINE");
 }
 
 std::string UdpAgentServer::handle_command(const std::string& command) {
     if (command == "PHOTO") {
-        const auto path = media_path("photo", ".jpg");
-        camera_.take_photo(path);
+        const auto path = controller_.take_photo();
         return "OK PHOTO " + path.string();
     }
     if (command == "RECORD_START") {
-        if (recording_) {
-            throw CameraError(CameraErrorCode::conflict,
-                              "Recording is already active");
-        }
-        const auto path = media_path("video", ".mp4");
-        camera_.start_recording(path);
-        recording_ = true;
+        const auto path = controller_.start_recording();
         return "OK RECORDING " + path.string();
     }
     if (command == "RECORD_STOP") {
-        camera_.stop_recording();
-        recording_ = false;
+        controller_.stop_recording();
         return "OK RECORDING_STOPPED";
     }
     if (command == "STREAM_START") {
-        if (streaming_) {
-            throw CameraError(CameraErrorCode::conflict,
-                              "Stream is already active");
-        }
-        camera_.start_live_stream({
-            .host = config_.client_host,
-            .port = config_.stream_port,
-        });
-        streaming_ = true;
+        controller_.start_network_stream();
         return "OK STREAMING";
     }
     if (command == "STREAM_STOP") {
-        camera_.stop_live_stream();
-        streaming_ = false;
+        controller_.stop_network_stream();
         return "OK STREAM_STOPPED";
     }
     if (command == "STATUS") {
-        return "OK STATUS recording=" + std::to_string(recording_.load()) +
-               " streaming=" + std::to_string(streaming_.load());
+        const auto status = controller_.status();
+        return "OK STATUS recording=" + std::to_string(status.recording) +
+               " streaming=" +
+               std::to_string(status.network_streaming);
     }
     throw CameraError(CameraErrorCode::invalid_argument,
                       "Unknown command: " + command);
 }
 
-std::filesystem::path UdpAgentServer::media_path(
-    const std::string& prefix, const std::string& extension) const {
-    const auto now = std::chrono::system_clock::now();
-    const auto time = std::chrono::system_clock::to_time_t(now);
-    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
-                                  now.time_since_epoch()) %
-                              1000;
-    std::tm local{};
-    localtime_r(&time, &local);
-
-    std::ostringstream name;
-    name << prefix << '_' << std::put_time(&local, "%Y%m%d_%H%M%S") << '_'
-         << std::setfill('0') << std::setw(3) << milliseconds.count()
-         << extension;
-    return config_.media_directory / name.str();
-}
-
 void UdpAgentServer::send_heartbeat(const std::string& state) const {
     const auto destination =
         endpoint(config_.client_host, config_.heartbeat_port);
+    const auto status = controller_.status();
     const std::string message =
         "CAMERA_MANAGER|" + state +
-        "|recording=" + std::to_string(recording_.load()) +
-        "|streaming=" + std::to_string(streaming_.load()) +
+        "|recording=" + std::to_string(status.recording) +
+        "|streaming=" + std::to_string(status.network_streaming) +
         "|command_port=" + std::to_string(config_.command_port) +
         "|stream_port=" + std::to_string(config_.stream_port);
     sendto(socket_, message.data(), message.size(), 0,
            reinterpret_cast<const sockaddr*>(&destination),
            sizeof(destination));
-}
-
-void UdpAgentServer::stop_outputs() noexcept {
-    try {
-        if (recording_.exchange(false)) {
-            camera_.stop_recording();
-        }
-    } catch (...) {
-    }
-    try {
-        if (streaming_.exchange(false)) {
-            camera_.stop_live_stream();
-        }
-    } catch (...) {
-    }
 }
 
 }  // namespace camera_agent

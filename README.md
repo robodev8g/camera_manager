@@ -21,9 +21,10 @@ client-facing domain model.
 
 ## Build
 
-Requirements are a C++20 compiler, CMake 3.24+, OpenCV 4 development files,
-Linux V4L2 headers, and an OpenCV build with GStreamer support. The live stream
-pipeline also needs the GStreamer OpenH264 and RTP plugins at runtime.
+Requirements are a C++20 compiler, CMake 3.24+, OpenCV 4 development files
+(including HighGUI), Linux V4L2 headers, and an OpenCV build with GStreamer
+support. The live stream pipeline also needs the GStreamer OpenH264 and RTP
+plugins at runtime.
 
 ```bash
 cmake -S . -B build
@@ -53,6 +54,18 @@ Then start the C++ agent on the camera computer:
 ```bash
 ./build/agent/camera-agent config/agent.conf
 ```
+
+To enable the local interactive CLI, add `--interactive`:
+
+```bash
+./build/agent/camera-agent config/agent.conf --interactive
+```
+
+The commands are `photo`, `record start`, `record stop`, `preview start`,
+`preview stop`, `status`, and `quit`. `stream start` and `stream stop` are aliases
+for the local preview commands. The preview uses an OpenCV window and therefore
+requires a graphical display. UDP `STREAM_START` and `STREAM_STOP` continue to
+control the separate H.264/RTP network stream.
 
 The agent sends a heartbeat every second. The GUI considers it offline after
 three seconds without a heartbeat. Buttons request a remote photo, start/stop a

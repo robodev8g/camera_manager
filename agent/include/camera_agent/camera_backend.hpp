@@ -17,7 +17,8 @@ public:
     virtual void stop_recording() = 0;
     virtual void start_live_stream(const LiveStreamTarget& target) = 0;
     virtual void stop_live_stream() = 0;
+    virtual void start_local_preview() = 0;
+    virtual void stop_local_preview() = 0;
 };
 
 }  // namespace camera_agent
-
