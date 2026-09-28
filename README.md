@@ -4,11 +4,16 @@ A small camera manager built one step at a time. It provides a camera adapter
 interface (`ICameraAdapter`) and a V4L2 implementation
 (`V4L2CameraAdapter`) backed by OpenCV.
 
-Commands are represented independently of their input transport. The
-`CommandHandler` executes camera and media operations, while an
-`ICommandSource` supplies commands and receives results. The current source is
-`CliCommandSource`; a UDP source can be added later without duplicating command
-handling.
+Commands are represented independently of their input transport. Each
+`ICommandSource` pushes parsed commands into a shared FIFO `CommandQueue`,
+and one `CommandExecutor` processes them in order. The `CommandHandler`
+contains the camera and media operations. The current source is
+`CliCommandSource`; a UDP source can later push into the same queue without
+duplicating command handling.
+
+Live view is dispatched through `MainThreadTaskQueue` because OpenCV GUI work
+must run on the main thread. The executor remains free to process snapshots and
+recording commands while the preview is open.
 
 The adapter supports:
 
