@@ -21,10 +21,15 @@ cmake --build build
 ## Live view
 
 ```bash
-./build/camera-manager
+./run-camera-manager.sh
 ```
 
 Press `q` or `Esc` to close the window.
+
+The launcher selects Qt's simple input method before OpenCV loads its Qt
+window backend. This avoids a harmless Qt5 Wayland/IBus initialization warning.
+When configuring an IDE run target directly, set the environment variable
+`QT_IM_MODULE=compose` and run `build/camera-manager`.
 
 `V4L2CameraAdapter` opens camera index `0` by default. Another index can be
 selected in code:
