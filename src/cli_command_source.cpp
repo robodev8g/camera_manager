@@ -71,11 +71,10 @@ void CliCommandSource::publish_result(const CommandResult& result) {
         return;
     }
 
-    std::ostream& output = result.success ? std::cout : std::cerr;
     if (!result.success) {
-        output << "Error: ";
+        std::cout << "Error: ";
     }
-    output << result.message << '\n';
+    std::cout << result.message << '\n';
 }
 
 }  // namespace camera_manager
