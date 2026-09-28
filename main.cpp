@@ -1,27 +1,17 @@
-#include <opencv2/highgui.hpp>
-#include <opencv2/videoio.hpp>
+#include "camera_manager/camera_adapter.hpp"
+#include "camera_manager/v4l2_camera_adapter.hpp"
 
+#include <exception>
 #include <iostream>
+#include <memory>
 
 int main() {
-    cv::VideoCapture camera(0);
-    if (!camera.isOpened()) {
-        std::cerr << "Could not open the camera.\n";
+    try {
+        std::unique_ptr<camera_manager::CameraAdapter> camera =
+            std::make_unique<camera_manager::V4L2CameraAdapter>();
+        camera->live_view();
+    } catch (const std::exception& error) {
+        std::cerr << "Camera error: " << error.what() << '\n';
         return 1;
     }
-
-    std::cout << "Press q or Esc to quit.\n";
-
-    cv::Mat frame;
-    while (camera.read(frame)) {
-        cv::imshow("Live camera", frame);
-
-        const int key = cv::waitKey(1);
-        if (key == 'q' || key == 27) {
-            return 0;
-        }
-    }
-
-    std::cerr << "The camera stopped producing frames.\n";
-    return 1;
 }
