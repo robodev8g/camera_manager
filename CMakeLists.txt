@@ -12,6 +12,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(agent)
+add_subdirectory(examples)
 
 if(CAMERA_MANAGER_BUILD_TESTS)
     include(CTest)

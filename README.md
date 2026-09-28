@@ -32,6 +32,22 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
+## Simple live-view example
+
+Connect a camera, then run the small OpenCV example:
+
+```bash
+./build/examples/simple-live-view
+```
+
+It uses `/dev/video0` by default. Pass another V4L2 device when needed:
+
+```bash
+./build/examples/simple-live-view /dev/video2
+```
+
+Press `q` or `Esc` to close the live-view window.
+
 ## Run the agent and GUI
 
 Copy the example configuration and edit at least `client_host` and
