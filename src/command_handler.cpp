@@ -123,7 +123,16 @@ void CommandHandler::run(ICommandSource& source) {
         try {
             while (true) {
                 const CameraCommand command = source.wait_for_command();
-                source.publish_result(handle(command));
+                CommandResult result;
+                try {
+                    result = handle(command);
+                } catch (const std::exception& error) {
+                    result = {error.what(), false};
+                } catch (...) {
+                    result = {"unknown command error", false};
+                }
+
+                source.publish_result(result);
                 if (command.type == CameraCommandType::shutdown) {
                     return;
                 }
@@ -152,10 +161,22 @@ void CommandHandler::run(ICommandSource& source) {
         preview_active_ = true;
         lock.unlock();
 
-        camera_.live_view();
+        CommandResult preview_result;
+        try {
+            camera_.live_view();
+        } catch (const std::exception& error) {
+            preview_result = {error.what(), false};
+        } catch (...) {
+            preview_result = {"unknown live-view error", false};
+        }
 
         lock.lock();
         preview_active_ = false;
+        lock.unlock();
+
+        if (!preview_result.message.empty()) {
+            source.publish_result(preview_result);
+        }
     }
 
     source_thread.join();

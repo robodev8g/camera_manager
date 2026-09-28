@@ -21,6 +21,7 @@ struct CameraCommand {
 
 struct CommandResult {
     std::string message;
+    bool success{true};
 };
 
 }  // namespace camera_manager
