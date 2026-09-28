@@ -1,15 +1,14 @@
-#include "i_camera_adapter.hpp"
+#include "camera_cli.hpp"
 #include "v4l2_camera_adapter.hpp"
 
 #include <exception>
 #include <iostream>
-#include <memory>
 
 int main() {
     try {
-        std::unique_ptr<camera_manager::ICameraAdapter> camera =
-            std::make_unique<camera_manager::V4L2CameraAdapter>();
-        camera->live_view();
+        camera_manager::V4L2CameraAdapter camera;
+        camera_manager::CameraCli cli(camera);
+        cli.run();
     } catch (const std::exception& error) {
         std::cerr << "Camera error: " << error.what() << '\n';
         return 1;

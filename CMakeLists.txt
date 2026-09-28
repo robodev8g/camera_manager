@@ -19,6 +19,9 @@ target_include_directories(camera-adapter
 target_link_libraries(camera-adapter PRIVATE ${OpenCV_LIBS} Threads::Threads)
 target_compile_options(camera-adapter PRIVATE -Wall -Wextra -Wpedantic)
 
-add_executable(camera-manager main.cpp)
+add_executable(camera-manager
+    main.cpp
+    src/camera_cli.cpp
+)
 target_link_libraries(camera-manager PRIVATE camera-adapter)
 target_compile_options(camera-manager PRIVATE -Wall -Wextra -Wpedantic)

@@ -18,13 +18,20 @@ cmake -S . -B build
 cmake --build build
 ```
 
-## Live view
+## Run
 
 ```bash
 ./run-camera-manager.sh
 ```
 
-Press `q` or `Esc` to close the window.
+The CLI menu provides these actions:
+
+- take a snapshot;
+- start or stop recording;
+- open live view;
+- exit.
+
+Press `q` or `Esc` to close the live-view window and return to the menu.
 
 The launcher selects Qt's simple input method before OpenCV loads its Qt
 window backend. This avoids a harmless Qt5 Wayland/IBus initialization warning.
