@@ -1,3 +1,4 @@
+#include "app_config.hpp"
 #include "camera_cli.hpp"
 #include "v4l2_camera_adapter.hpp"
 
@@ -5,17 +6,17 @@
 #include <filesystem>
 #include <iostream>
 
-namespace {
-const std::filesystem::path media_dir_path{"/home/user/projects/camera_manager/media"};
-}
-
-int main() {
+int main(int argc, char* argv[]) {
     try {
-        camera_manager::V4L2CameraAdapter camera;
-        camera_manager::CameraCli cli(camera, media_dir_path);
+        const std::filesystem::path config_path =
+            argc > 1 ? argv[1] : "config/camera_manager.conf";
+        const auto config = camera_manager::load_config(config_path);
+
+        camera_manager::V4L2CameraAdapter camera(config.camera_device_index);
+        camera_manager::CameraCli cli(camera, config.media_directory);
         cli.run();
     } catch (const std::exception& error) {
-        std::cerr << "Camera error: " << error.what() << '\n';
+        std::cerr << "Error: " << error.what() << '\n';
         return 1;
     }
 }

@@ -21,6 +21,7 @@ target_compile_options(camera-adapter PRIVATE -Wall -Wextra -Wpedantic)
 
 add_executable(camera-manager
     main.cpp
+    src/app_config.cpp
     src/camera_cli.cpp
 )
 target_link_libraries(camera-manager PRIVATE camera-adapter)
