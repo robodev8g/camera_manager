@@ -1,7 +1,8 @@
 # Camera Manager
 
 A small camera manager built one step at a time. The first step provides a
-camera adapter interface and a V4L2 implementation backed by OpenCV.
+camera adapter interface (`ICameraAdapter`) and a V4L2 implementation
+(`V4L2CameraAdapter`) backed by OpenCV.
 
 The adapter supports:
 

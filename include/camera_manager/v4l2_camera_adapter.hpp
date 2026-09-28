@@ -1,13 +1,13 @@
 #pragma once
 
-#include "camera_manager/camera_adapter.hpp"
+#include "camera_manager/i_camera_adapter.hpp"
 
 #include <filesystem>
 #include <memory>
 
 namespace camera_manager {
 
-class V4L2CameraAdapter final : public CameraAdapter {
+class V4L2CameraAdapter final : public ICameraAdapter {
 public:
     explicit V4L2CameraAdapter(int device_index = 0);
     ~V4L2CameraAdapter() override;
