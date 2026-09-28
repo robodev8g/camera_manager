@@ -13,6 +13,8 @@ The adapter supports:
 
 ## Build
 
+Requirements include OpenCV 4 and JsonCpp development packages.
+
 ```bash
 cmake -S . -B build
 cmake --build build
@@ -20,14 +22,17 @@ cmake --build build
 
 ## Configure
 
-The default configuration is `config/camera_manager.conf`:
+The default configuration is `config/camera_manager.json`:
 
-```ini
-camera_device_index=0
-media_directory=media
+```json
+{
+  "camera_device_index": 0,
+  "media_directory": "media"
+}
 ```
 
-Both values are required. Blank lines and lines beginning with `#` are ignored.
+Both values are required. Unknown fields and values with the wrong JSON type
+are rejected.
 
 ## Run
 
@@ -38,7 +43,7 @@ Both values are required. Blank lines and lines beginning with `#` are ignored.
 Pass another configuration file when needed:
 
 ```bash
-./run-camera-manager.sh path/to/camera_manager.conf
+./run-camera-manager.sh path/to/camera_manager.json
 ```
 
 The CLI menu provides these actions:
@@ -46,6 +51,8 @@ The CLI menu provides these actions:
 - take a snapshot;
 - start or stop recording;
 - open live view;
+- list files in the configured media directory;
+- remove a media file by filename;
 - exit.
 
 Press `q` or `Esc` to close the live-view window and return to the menu. The

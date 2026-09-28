@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(OpenCV 4 REQUIRED COMPONENTS core highgui imgcodecs videoio)
 find_package(Threads REQUIRED)
+find_package(jsoncpp CONFIG REQUIRED)
 
 add_library(camera-adapter
     src/v4l2_camera_adapter.cpp
@@ -24,5 +25,5 @@ add_executable(camera-manager
     src/app_config.cpp
     src/camera_cli.cpp
 )
-target_link_libraries(camera-manager PRIVATE camera-adapter)
+target_link_libraries(camera-manager PRIVATE camera-adapter JsonCpp::JsonCpp)
 target_compile_options(camera-manager PRIVATE -Wall -Wextra -Wpedantic)

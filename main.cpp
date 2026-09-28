@@ -9,7 +9,7 @@
 int main(int argc, char* argv[]) {
     try {
         const std::filesystem::path config_path =
-            argc > 1 ? argv[1] : "config/camera_manager.conf";
+            argc > 1 ? argv[1] : "config/camera_manager.json";
         const auto config = camera_manager::load_config(config_path);
 
         camera_manager::V4L2CameraAdapter camera(config.camera_device_index);

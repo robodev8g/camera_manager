@@ -1,12 +1,15 @@
 #include "camera_cli.hpp"
 
+#include <algorithm>
 #include <ctime>
 #include <filesystem>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <stdexcept>
 #include <thread>
 #include <utility>
+#include <vector>
 
 namespace camera_manager {
 namespace {
@@ -37,8 +40,51 @@ void CameraCli::print_menu() const {
               << "2. Start recording\n"
               << "3. Stop recording\n"
               << "4. Live view\n"
+              << "5. List media\n"
+              << "6. Remove media\n"
               << "0. Exit\n"
               << "> ";
+}
+
+void CameraCli::list_media() const {
+    std::vector<std::filesystem::path> filenames;
+    if (std::filesystem::exists(media_dir_path_)) {
+        for (const auto& entry :
+             std::filesystem::directory_iterator(media_dir_path_)) {
+            if (entry.is_regular_file()) {
+                filenames.push_back(entry.path().filename());
+            }
+        }
+    }
+
+    std::sort(filenames.begin(), filenames.end());
+    if (filenames.empty()) {
+        std::cout << "Media directory is empty\n";
+        return;
+    }
+
+    std::cout << "Media files:\n";
+    for (const auto& filename : filenames) {
+        std::cout << "- " << filename.string() << '\n';
+    }
+}
+
+void CameraCli::remove_media() const {
+    std::string name;
+    std::cout << "Media filename: ";
+    std::cin >> name;
+
+    const std::filesystem::path filename{name};
+    if (filename.empty() || filename == "." || filename == ".." ||
+        filename != filename.filename()) {
+        throw std::invalid_argument("media name must be a filename");
+    }
+
+    const auto media_path = media_dir_path_ / filename;
+    if (!std::filesystem::remove(media_path)) {
+        throw std::runtime_error("media file not found: " + name);
+    }
+    std::cout << "Removed " << filename.string() << '\n';
 }
 
 void CameraCli::request_live_view() {
@@ -83,6 +129,12 @@ void CameraCli::read_commands() {
             break;
         case 4:
             request_live_view();
+            break;
+        case 5:
+            list_media();
+            break;
+        case 6:
+            remove_media();
             break;
         case 0: {
             std::lock_guard<std::mutex> lock(state_mutex_);

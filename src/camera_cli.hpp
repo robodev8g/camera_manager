@@ -17,6 +17,8 @@ public:
 
 private:
     void print_menu() const;
+    void list_media() const;
+    void remove_media() const;
     void read_commands();
     void request_live_view();
 
