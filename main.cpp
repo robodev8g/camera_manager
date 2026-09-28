@@ -1,5 +1,6 @@
 #include "app_config.hpp"
-#include "camera_cli.hpp"
+#include "cli_command_source.hpp"
+#include "command_handler.hpp"
 #include "v4l2_camera_adapter.hpp"
 
 #include <exception>
@@ -13,8 +14,10 @@ int main(int argc, char* argv[]) {
         const auto config = camera_manager::load_config(config_path);
 
         camera_manager::V4L2CameraAdapter camera(config.camera_device_index);
-        camera_manager::CameraCli cli(camera, config.media_directory);
-        cli.run();
+        camera_manager::CommandHandler command_handler(
+            camera, config.media_directory);
+        camera_manager::CliCommandSource command_source;
+        command_handler.run(command_source);
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << '\n';
         return 1;

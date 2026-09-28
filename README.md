@@ -4,6 +4,12 @@ A small camera manager built one step at a time. It provides a camera adapter
 interface (`ICameraAdapter`) and a V4L2 implementation
 (`V4L2CameraAdapter`) backed by OpenCV.
 
+Commands are represented independently of their input transport. The
+`CommandHandler` executes camera and media operations, while an
+`ICommandSource` supplies commands and receives results. The current source is
+`CliCommandSource`; a UDP source can be added later without duplicating command
+handling.
+
 The adapter supports:
 
 - `take_snapshot(path)`
