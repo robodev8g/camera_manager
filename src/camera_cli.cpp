@@ -5,14 +5,15 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <utility>
 
 namespace camera_manager {
 namespace {
 
-std::filesystem::path make_media_path(const char* type,
+std::filesystem::path make_media_path(const std::filesystem::path& directory,
+                                      const char* type,
                                       const char* extension) {
-    const std::filesystem::path media_directory = "media";
-    std::filesystem::create_directories(media_directory);
+    std::filesystem::create_directories(directory);
 
     const std::time_t now = std::time(nullptr);
     const std::tm local_time = *std::localtime(&now);
@@ -20,12 +21,14 @@ std::filesystem::path make_media_path(const char* type,
     std::ostringstream filename;
     filename << type << '_' << std::put_time(&local_time, "%Y%m%d_%H%M%S")
              << extension;
-    return media_directory / filename.str();
+    return directory / filename.str();
 }
 
 }  // namespace
 
-CameraCli::CameraCli(ICameraAdapter& camera) : camera_(camera) {}
+CameraCli::CameraCli(ICameraAdapter& camera,
+                     std::filesystem::path media_dir_path)
+    : camera_(camera), media_dir_path_(std::move(media_dir_path)) {}
 
 void CameraCli::print_menu() const {
     std::cout << "\nCamera Manager\n"
@@ -46,13 +49,15 @@ void CameraCli::run() {
 
         switch (command) {
         case 1: {
-            const auto output = make_media_path("photo", ".png");
+            const auto output =
+                make_media_path(media_dir_path_, "photo", ".png");
             camera_.take_snapshot(output);
             std::cout << "Snapshot saved to " << output << '\n';
             break;
         }
         case 2: {
-            const auto output = make_media_path("video", ".mp4");
+            const auto output =
+                make_media_path(media_dir_path_, "video", ".mp4");
             camera_.start_record(output);
             std::cout << "Recording started: " << output << '\n';
             break;
