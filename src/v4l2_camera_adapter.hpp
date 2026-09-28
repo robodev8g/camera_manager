@@ -1,6 +1,6 @@
 #pragma once
 
-#include "camera_manager/i_camera_adapter.hpp"
+#include "i_camera_adapter.hpp"
 
 #include <filesystem>
 #include <memory>

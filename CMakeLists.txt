@@ -10,11 +10,10 @@ find_package(OpenCV 4 REQUIRED COMPONENTS core highgui imgcodecs videoio)
 find_package(Threads REQUIRED)
 
 add_library(camera-adapter
-    src/i_camera_adapter.cpp
     src/v4l2_camera_adapter.cpp
 )
 target_include_directories(camera-adapter
-    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
     PRIVATE ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(camera-adapter PRIVATE ${OpenCV_LIBS} Threads::Threads)

@@ -1,5 +1,5 @@
-#include "camera_manager/i_camera_adapter.hpp"
-#include "camera_manager/v4l2_camera_adapter.hpp"
+#include "i_camera_adapter.hpp"
+#include "v4l2_camera_adapter.hpp"
 
 #include <exception>
 #include <iostream>

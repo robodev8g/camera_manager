@@ -1,4 +1,4 @@
-#include "camera_manager/v4l2_camera_adapter.hpp"
+#include "v4l2_camera_adapter.hpp"
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>

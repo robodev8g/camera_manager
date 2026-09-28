@@ -6,7 +6,7 @@ namespace camera_manager {
 
 class ICameraAdapter {
 public:
-    virtual ~ICameraAdapter();
+    virtual ~ICameraAdapter() = default;
 
     virtual void take_snapshot(const std::filesystem::path& output) = 0;
     virtual void start_record(const std::filesystem::path& output) = 0;
