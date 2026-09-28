@@ -2,85 +2,65 @@
 
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
-#include <opencv2/videoio.hpp>
 
-#include <atomic>
-#include <mutex>
 #include <stdexcept>
-#include <thread>
-#include <utility>
 
 namespace camera_manager {
 
-struct V4L2CameraAdapter::Impl {
-    explicit Impl(int device_index) : camera(device_index, cv::CAP_V4L2) {
-        if (!camera.isOpened()) {
-            throw std::runtime_error("could not open the V4L2 camera");
-        }
-
-        if (!camera.read(latest_frame) || latest_frame.empty()) {
-            throw std::runtime_error("the camera did not produce a frame");
-        }
-
-        frames_per_second = camera.get(cv::CAP_PROP_FPS);
-        if (frames_per_second <= 0.0) {
-            frames_per_second = 30.0;
-        }
-
-        capture_thread = std::thread([this] { capture_loop(); });
-    }
-
-    ~Impl() {
-        running = false;
-        if (capture_thread.joinable()) {
-            capture_thread.join();
-        }
-
-        std::lock_guard<std::mutex> lock(mutex);
-        recorder.release();
-        camera.release();
-    }
-
-    void ensure_running() const {
-        if (capture_failed) {
-            throw std::runtime_error("camera capture stopped");
-        }
-    }
-
-    void capture_loop() noexcept {
-        try {
-            cv::Mat frame;
-            while (running) {
-                if (!camera.read(frame) || frame.empty()) {
-                    capture_failed = true;
-                    return;
-                }
-
-                std::lock_guard<std::mutex> lock(mutex);
-                frame.copyTo(latest_frame);
-                if (recorder.isOpened()) {
-                    recorder.write(frame);
-                }
-            }
-        } catch (...) {
-            capture_failed = true;
-        }
-    }
-
-    cv::VideoCapture camera;
-    cv::VideoWriter recorder;
-    cv::Mat latest_frame;
-    double frames_per_second{30.0};
-    std::mutex mutex;
-    std::thread capture_thread;
-    std::atomic_bool running{true};
-    std::atomic_bool capture_failed{false};
-};
-
 V4L2CameraAdapter::V4L2CameraAdapter(int device_index)
-    : impl_(std::make_unique<Impl>(device_index)) {}
+    : camera_(device_index, cv::CAP_V4L2) {
+    if (!camera_.isOpened()) {
+        throw std::runtime_error("could not open the V4L2 camera");
+    }
 
-V4L2CameraAdapter::~V4L2CameraAdapter() = default;
+    if (!camera_.read(latest_frame_) || latest_frame_.empty()) {
+        throw std::runtime_error("the camera did not produce a frame");
+    }
+
+    frames_per_second_ = camera_.get(cv::CAP_PROP_FPS);
+    if (frames_per_second_ <= 0.0) {
+        frames_per_second_ = 30.0;
+    }
+
+    capture_thread_ = std::thread([this] { capture_loop(); });
+}
+
+V4L2CameraAdapter::~V4L2CameraAdapter() {
+    running_ = false;
+    if (capture_thread_.joinable()) {
+        capture_thread_.join();
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    recorder_.release();
+    camera_.release();
+}
+
+void V4L2CameraAdapter::capture_loop() noexcept {
+    try {
+        cv::Mat frame;
+        while (running_) {
+            if (!camera_.read(frame) || frame.empty()) {
+                capture_failed_ = true;
+                return;
+            }
+
+            std::lock_guard<std::mutex> lock(mutex_);
+            frame.copyTo(latest_frame_);
+            if (recorder_.isOpened()) {
+                recorder_.write(frame);
+            }
+        }
+    } catch (...) {
+        capture_failed_ = true;
+    }
+}
+
+void V4L2CameraAdapter::ensure_running() const {
+    if (capture_failed_) {
+        throw std::runtime_error("camera capture stopped");
+    }
+}
 
 void V4L2CameraAdapter::take_snapshot(
     const std::filesystem::path& output) {
@@ -90,9 +70,9 @@ void V4L2CameraAdapter::take_snapshot(
 
     cv::Mat snapshot;
     {
-        std::lock_guard<std::mutex> lock(impl_->mutex);
-        impl_->ensure_running();
-        impl_->latest_frame.copyTo(snapshot);
+        std::lock_guard<std::mutex> lock(mutex_);
+        ensure_running();
+        latest_frame_.copyTo(snapshot);
     }
 
     if (!cv::imwrite(output.string(), snapshot)) {
@@ -107,27 +87,26 @@ void V4L2CameraAdapter::start_record(
         throw std::invalid_argument("recording path must not be empty");
     }
 
-    std::lock_guard<std::mutex> lock(impl_->mutex);
-    impl_->ensure_running();
-    if (impl_->recorder.isOpened()) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    ensure_running();
+    if (recorder_.isOpened()) {
         throw std::logic_error("a recording is already active");
     }
 
     const int codec = cv::VideoWriter::fourcc('m', 'p', '4', 'v');
-    const cv::Size size(impl_->latest_frame.cols, impl_->latest_frame.rows);
-    if (!impl_->recorder.open(output.string(), codec,
-                              impl_->frames_per_second, size)) {
+    const cv::Size size(latest_frame_.cols, latest_frame_.rows);
+    if (!recorder_.open(output.string(), codec, frames_per_second_, size)) {
         throw std::runtime_error("could not start recording: " +
                                  output.string());
     }
 }
 
 void V4L2CameraAdapter::stop_record() {
-    std::lock_guard<std::mutex> lock(impl_->mutex);
-    if (!impl_->recorder.isOpened()) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!recorder_.isOpened()) {
         throw std::logic_error("no recording is active");
     }
-    impl_->recorder.release();
+    recorder_.release();
 }
 
 void V4L2CameraAdapter::live_view() {
@@ -138,9 +117,9 @@ void V4L2CameraAdapter::live_view() {
         while (true) {
             cv::Mat frame;
             {
-                std::lock_guard<std::mutex> lock(impl_->mutex);
-                impl_->ensure_running();
-                impl_->latest_frame.copyTo(frame);
+                std::lock_guard<std::mutex> lock(mutex_);
+                ensure_running();
+                latest_frame_.copyTo(frame);
             }
 
             cv::imshow(window_name, frame);

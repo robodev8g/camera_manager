@@ -2,8 +2,13 @@
 
 #include "i_camera_adapter.hpp"
 
+#include <opencv2/core/mat.hpp>
+#include <opencv2/videoio.hpp>
+
+#include <atomic>
 #include <filesystem>
-#include <memory>
+#include <mutex>
+#include <thread>
 
 namespace camera_manager {
 
@@ -23,8 +28,17 @@ public:
     void live_view() override;
 
 private:
-    struct Impl;
-    std::unique_ptr<Impl> impl_;
+    void capture_loop() noexcept;
+    void ensure_running() const;
+
+    cv::VideoCapture camera_;
+    cv::VideoWriter recorder_;
+    cv::Mat latest_frame_;
+    double frames_per_second_{30.0};
+    std::mutex mutex_;
+    std::thread capture_thread_;
+    std::atomic_bool running_{true};
+    std::atomic_bool capture_failed_{false};
 };
 
 }  // namespace camera_manager

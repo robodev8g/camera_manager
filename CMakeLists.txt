@@ -14,7 +14,7 @@ add_library(camera-adapter
 )
 target_include_directories(camera-adapter
     PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src
-    PRIVATE ${OpenCV_INCLUDE_DIRS}
+    PUBLIC ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(camera-adapter PRIVATE ${OpenCV_LIBS} Threads::Threads)
 target_compile_options(camera-adapter PRIVATE -Wall -Wextra -Wpedantic)
