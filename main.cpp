@@ -2,21 +2,20 @@
 #include <opencv2/videoio.hpp>
 
 #include <iostream>
-#include <string>
 
-int main(int argc, char* argv[]) {
-    const std::string device = argc > 1 ? argv[1] : "/dev/video0";
-    cv::VideoCapture camera(device, cv::CAP_V4L2);
-
+int main() {
+    cv::VideoCapture camera(0);
     if (!camera.isOpened()) {
-        std::cerr << "Could not open camera: " << device << '\n';
+        std::cerr << "Could not open the camera.\n";
         return 1;
     }
 
-    std::cout << "Showing " << device << ". Press q or Esc to quit.\n";
+    std::cout << "Press q or Esc to quit.\n";
+
     cv::Mat frame;
     while (camera.read(frame)) {
         cv::imshow("Live camera", frame);
+
         const int key = cv::waitKey(1);
         if (key == 'q' || key == 27) {
             return 0;

@@ -1,8 +1,8 @@
-.idea/
 build/
+cmake-build-*/
+.idea/
 __pycache__/
 media/
-cmake-build-debug/
 *.mp4
 *.png
 *.jpg
