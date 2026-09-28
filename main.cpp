@@ -6,7 +6,7 @@
 #include <iostream>
 
 namespace {
-const std::filesystem::path media_dir_path{"media"};
+const std::filesystem::path media_dir_path{"/home/user/projects/camera_manager/media"};
 }
 
 int main() {
