@@ -1,9 +1,29 @@
 #include "camera_cli.hpp"
 
+#include <ctime>
+#include <filesystem>
+#include <iomanip>
 #include <iostream>
-#include <string>
+#include <sstream>
 
 namespace camera_manager {
+namespace {
+
+std::filesystem::path make_media_path(const char* type,
+                                      const char* extension) {
+    const std::filesystem::path media_directory = "media";
+    std::filesystem::create_directories(media_directory);
+
+    const std::time_t now = std::time(nullptr);
+    const std::tm local_time = *std::localtime(&now);
+
+    std::ostringstream filename;
+    filename << type << '_' << std::put_time(&local_time, "%Y%m%d_%H%M%S")
+             << extension;
+    return media_directory / filename.str();
+}
+
+}  // namespace
 
 CameraCli::CameraCli(ICameraAdapter& camera) : camera_(camera) {}
 
@@ -26,19 +46,15 @@ void CameraCli::run() {
 
         switch (command) {
         case 1: {
-            std::string output;
-            std::cout << "Snapshot path: ";
-            std::cin >> output;
+            const auto output = make_media_path("photo", ".png");
             camera_.take_snapshot(output);
             std::cout << "Snapshot saved to " << output << '\n';
             break;
         }
         case 2: {
-            std::string output;
-            std::cout << "Recording path: ";
-            std::cin >> output;
+            const auto output = make_media_path("video", ".mp4");
             camera_.start_record(output);
-            std::cout << "Recording started\n";
+            std::cout << "Recording started: " << output << '\n';
             break;
         }
         case 3:

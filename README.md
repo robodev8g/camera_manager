@@ -33,6 +33,11 @@ The CLI menu provides these actions:
 
 Press `q` or `Esc` to close the live-view window and return to the menu.
 
+Photos and videos are saved automatically under `media/` using timestamps:
+
+- `media/photo_YYYYMMDD_HHMMSS.png`
+- `media/video_YYYYMMDD_HHMMSS.mp4`
+
 The launcher selects Qt's simple input method before OpenCV loads its Qt
 window backend. This avoids a harmless Qt5 Wayland/IBus initialization warning.
 When configuring an IDE run target directly, set the environment variable
