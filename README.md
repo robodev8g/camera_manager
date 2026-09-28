@@ -32,6 +32,8 @@ The CLI menu provides these actions:
 - exit.
 
 Press `q` or `Esc` to close the live-view window and return to the menu.
+The CLI remains active while live view is open, so snapshots and recording
+commands can be entered at the same time.
 
 Photos and videos are saved automatically under `media/` using timestamps:
 

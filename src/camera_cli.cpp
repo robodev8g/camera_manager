@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <iostream>
 #include <sstream>
+#include <thread>
 #include <utility>
 
 namespace camera_manager {
@@ -40,7 +41,21 @@ void CameraCli::print_menu() const {
               << "> ";
 }
 
-void CameraCli::run() {
+void CameraCli::request_live_view() {
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        if (live_view_requested_ || live_view_active_) {
+            std::cout << "Live view is already open\n";
+            return;
+        }
+        live_view_requested_ = true;
+    }
+
+    std::cout << "Live view requested; press q or Esc in its window to close it\n";
+    state_changed_.notify_one();
+}
+
+void CameraCli::read_commands() {
     while (true) {
         print_menu();
 
@@ -67,12 +82,55 @@ void CameraCli::run() {
             std::cout << "Recording stopped\n";
             break;
         case 4:
-            std::cout << "Press q or Esc to close live view\n";
-            camera_.live_view();
+            request_live_view();
             break;
-        case 0:
+        case 0: {
+            std::lock_guard<std::mutex> lock(state_mutex_);
+            exit_requested_ = true;
+            state_changed_.notify_one();
             return;
         }
+        }
+    }
+}
+
+void CameraCli::run() {
+    std::thread command_thread([this] {
+        try {
+            read_commands();
+        } catch (...) {
+            {
+                std::lock_guard<std::mutex> lock(state_mutex_);
+                command_error_ = std::current_exception();
+                exit_requested_ = true;
+            }
+            state_changed_.notify_one();
+        }
+    });
+
+    while (true) {
+        std::unique_lock<std::mutex> lock(state_mutex_);
+        state_changed_.wait(lock, [this] {
+            return live_view_requested_ || exit_requested_;
+        });
+
+        if (exit_requested_) {
+            break;
+        }
+
+        live_view_requested_ = false;
+        live_view_active_ = true;
+        lock.unlock();
+
+        camera_.live_view();
+
+        lock.lock();
+        live_view_active_ = false;
+    }
+
+    command_thread.join();
+    if (command_error_) {
+        std::rethrow_exception(command_error_);
     }
 }
 
