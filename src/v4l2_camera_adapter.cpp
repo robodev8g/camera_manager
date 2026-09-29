@@ -109,12 +109,13 @@ void V4L2CameraAdapter::stop_record() {
     recorder_.release();
 }
 
-void V4L2CameraAdapter::live_view() {
+void V4L2CameraAdapter::live_view(
+    const std::atomic_bool& stop_requested) {
     constexpr const char* window_name = "Camera Manager";
     cv::namedWindow(window_name, cv::WINDOW_AUTOSIZE);
 
     try {
-        while (true) {
+        while (!stop_requested.load()) {
             cv::Mat frame;
             {
                 std::lock_guard<std::mutex> lock(mutex_);

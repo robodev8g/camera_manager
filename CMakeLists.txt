@@ -24,7 +24,9 @@ add_executable(camera-manager
     main.cpp
     src/app_config.cpp
     src/cli_command_source.cpp
+    src/command_executor.cpp
     src/command_handler.cpp
+    src/command_queue.cpp
 )
 target_link_libraries(camera-manager PRIVATE camera-adapter JsonCpp::JsonCpp)
 target_compile_options(camera-manager PRIVATE -Wall -Wextra -Wpedantic)

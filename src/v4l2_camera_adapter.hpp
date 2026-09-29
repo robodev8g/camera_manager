@@ -25,7 +25,7 @@ public:
     void take_snapshot(const std::filesystem::path& output) override;
     void start_record(const std::filesystem::path& output) override;
     void stop_record() override;
-    void live_view() override;
+    void live_view(const std::atomic_bool& stop_requested) override;
 
 private:
     void capture_loop() noexcept;

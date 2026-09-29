@@ -5,7 +5,6 @@
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
-#include <thread>
 #include <utility>
 #include <vector>
 
@@ -66,31 +65,7 @@ CommandResult CommandHandler::remove_media(const std::string& name) const {
     return {"Removed " + filename.string()};
 }
 
-CommandResult CommandHandler::request_local_preview() {
-    {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        if (preview_requested_ || preview_active_) {
-            return {"Live view is already open"};
-        }
-        preview_requested_ = true;
-    }
-
-    state_changed_.notify_one();
-    return {"Live view requested; press q or Esc in its window to close it"};
-}
-
-CommandResult CommandHandler::request_shutdown() {
-    {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        shutdown_requested_ = true;
-    }
-    state_changed_.notify_one();
-    return {};
-}
-
 CommandResult CommandHandler::handle(const CameraCommand& command) {
-    std::lock_guard<std::mutex> command_lock(command_mutex_);
-
     switch (command.type) {
     case CameraCommandType::take_snapshot: {
         const auto output = make_media_path("photo", ".png");
@@ -106,83 +81,23 @@ CommandResult CommandHandler::handle(const CameraCommand& command) {
         camera_.stop_record();
         return {"Recording stopped"};
     case CameraCommandType::open_local_preview:
-        return request_local_preview();
+        throw std::logic_error(
+            "main-thread command was sent directly to the command handler");
     case CameraCommandType::list_media:
         return list_media();
     case CameraCommandType::remove_media:
         return remove_media(command.argument);
     case CameraCommandType::shutdown:
-        return request_shutdown();
+        throw std::logic_error(
+            "main-thread command was sent directly to the command handler");
     }
 
     throw std::invalid_argument("unsupported camera command");
 }
 
-void CommandHandler::run(ICommandSource& source) {
-    std::thread source_thread([this, &source] {
-        try {
-            while (true) {
-                const CameraCommand command = source.wait_for_command();
-                CommandResult result;
-                try {
-                    result = handle(command);
-                } catch (const std::exception& error) {
-                    result = {error.what(), false};
-                } catch (...) {
-                    result = {"unknown command error", false};
-                }
-
-                source.publish_result(result);
-                if (command.type == CameraCommandType::shutdown) {
-                    return;
-                }
-            }
-        } catch (...) {
-            {
-                std::lock_guard<std::mutex> lock(state_mutex_);
-                source_error_ = std::current_exception();
-                shutdown_requested_ = true;
-            }
-            state_changed_.notify_one();
-        }
-    });
-
-    while (true) {
-        std::unique_lock<std::mutex> lock(state_mutex_);
-        state_changed_.wait(lock, [this] {
-            return preview_requested_ || shutdown_requested_;
-        });
-
-        if (shutdown_requested_) {
-            break;
-        }
-
-        preview_requested_ = false;
-        preview_active_ = true;
-        lock.unlock();
-
-        CommandResult preview_result;
-        try {
-            camera_.live_view();
-        } catch (const std::exception& error) {
-            preview_result = {error.what(), false};
-        } catch (...) {
-            preview_result = {"unknown live-view error", false};
-        }
-
-        lock.lock();
-        preview_active_ = false;
-        lock.unlock();
-
-        if (!preview_result.message.empty()) {
-            source.publish_result(preview_result);
-        }
-    }
-
-    source_thread.join();
-    if (source_error_) {
-        std::rethrow_exception(source_error_);
-    }
+void CommandHandler::run_local_preview(
+    const std::atomic_bool& stop_requested) {
+    camera_.live_view(stop_requested);
 }
 
 }  // namespace camera_manager

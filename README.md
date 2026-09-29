@@ -4,18 +4,25 @@ A small camera manager built one step at a time. It provides a camera adapter
 interface (`ICameraAdapter`) and a V4L2 implementation
 (`V4L2CameraAdapter`) backed by OpenCV.
 
-Commands are represented independently of their input transport. The
-`CommandHandler` executes camera and media operations, while an
-`ICommandSource` supplies commands and receives results. The current source is
-`CliCommandSource`; a UDP source can be added later without duplicating command
-handling.
+Commands are represented independently of their input transport. Every
+`ICommandSource` pushes commands and response callbacks into the same
+thread-safe FIFO `CommandQueue`. A single `CommandExecutor` consumes that queue,
+so commands from the CLI and future network sources share one ordering point.
+`CommandHandler` performs the camera and media operations without depending on
+the command transport.
+
+Local live view is the special main-thread operation. The executor changes the
+preview state and notifies the main thread, which owns the OpenCV window loop.
+The executor remains available for snapshots and recording commands while the
+preview is open. A shutdown command sets an atomic flag as well as notifying the
+main thread, allowing an active preview to close before the process exits.
 
 The adapter supports:
 
 - `take_snapshot(path)`
 - `start_record(path)`
 - `stop_record()`
-- `live_view()`
+- `live_view(stop_requested)`
 
 ## Build
 
@@ -63,7 +70,8 @@ The CLI menu provides these actions:
 
 Press `q` or `Esc` to close the live-view window and return to the menu. The
 CLI remains active while live view is open, so snapshots and recording commands
-can be entered at the same time.
+can be entered at the same time. Selecting Exit also closes an active live-view
+window and terminates the program.
 
 Photos and videos are saved under the configured media directory using
 timestamps:
