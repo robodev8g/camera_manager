@@ -123,6 +123,7 @@ Json::Value make_response(const Json::Value& id,
 }
 
 CommandResult parse_remote_command(const Json::Value& request,
+                                   const std::string& peer_address,
                                    CameraCommand& command) {
     if (!request.isObject()) {
         return {"request must be a JSON object", false};
@@ -138,6 +139,25 @@ CommandResult parse_remote_command(const Json::Value& request,
         command = {CameraCommandType::start_recording, {}};
     } else if (name == "stop_recording") {
         command = {CameraCommandType::stop_recording, {}};
+    } else if (name == "start_stream") {
+        const Json::Value& arguments = request["arguments"];
+        if (!arguments.isObject() ||
+            !arguments.isMember("udp_port") ||
+            !arguments["udp_port"].isUInt() ||
+            arguments["udp_port"].asUInt() == 0 ||
+            arguments["udp_port"].asUInt() > 65535) {
+            return {
+                "start_stream requires arguments.udp_port from 1 to 65535",
+                false,
+            };
+        }
+        command = {
+            CameraCommandType::start_stream,
+            peer_address,
+            static_cast<std::uint16_t>(arguments["udp_port"].asUInt()),
+        };
+    } else if (name == "stop_stream") {
+        command = {CameraCommandType::stop_stream, {}};
     } else if (name == "list_media") {
         command = {CameraCommandType::list_media, {}};
     } else if (name == "remove_media") {
@@ -235,6 +255,7 @@ void TcpCommandSource::send_response(
 void TcpCommandSource::serve_client(
     int client_socket,
     std::uint64_t connection_id,
+    const std::string& peer_address,
     CommandQueue& command_queue) {
     try {
         while (!stopping_.load()) {
@@ -269,7 +290,8 @@ void TcpCommandSource::serve_client(
             }
 
             CameraCommand command;
-            const CommandResult parsed = parse_remote_command(request, command);
+            const CommandResult parsed =
+                parse_remote_command(request, peer_address, command);
             if (!parsed.success) {
                 send_response(
                     connection_id,
@@ -328,10 +350,10 @@ void TcpCommandSource::run(CommandQueue& command_queue) {
             std::lock_guard<std::mutex> lock(socket_mutex_);
             client_socket_ = client;
             connection_id = ++connection_id_;
-            peer_address_ = std::move(peer_address);
+            peer_address_ = peer_address;
         }
 
-        serve_client(client, connection_id, command_queue);
+        serve_client(client, connection_id, peer_address, command_queue);
 
         {
             std::lock_guard<std::mutex> lock(socket_mutex_);

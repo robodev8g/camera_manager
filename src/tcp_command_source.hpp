@@ -28,6 +28,7 @@ public:
 private:
     void serve_client(int client_socket,
                       std::uint64_t connection_id,
+                      const std::string& peer_address,
                       CommandQueue& command_queue);
     void send_response(std::uint64_t connection_id,
                        std::string response) noexcept;

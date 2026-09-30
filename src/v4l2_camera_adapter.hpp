@@ -25,6 +25,9 @@ public:
     void take_snapshot(const std::filesystem::path& output) override;
     void start_record(const std::filesystem::path& output) override;
     void stop_record() override;
+    void start_stream(const std::string& destination,
+                      std::uint16_t port) override;
+    void stop_stream() override;
     void live_view(const std::atomic_bool& stop_requested) override;
 
 private:
@@ -33,6 +36,7 @@ private:
 
     cv::VideoCapture camera_;
     cv::VideoWriter recorder_;
+    cv::VideoWriter stream_writer_;
     cv::Mat latest_frame_;
     double frames_per_second_{30.0};
     std::mutex mutex_;

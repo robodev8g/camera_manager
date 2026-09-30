@@ -80,6 +80,15 @@ CommandResult CommandHandler::handle(const CameraCommand& command) {
     case CameraCommandType::stop_recording:
         camera_.stop_record();
         return {"Recording stopped"};
+    case CameraCommandType::start_stream:
+        camera_.start_stream(command.argument, command.port);
+        return {
+            "Stream started to " + command.argument + ":" +
+            std::to_string(command.port),
+        };
+    case CameraCommandType::stop_stream:
+        camera_.stop_stream();
+        return {"Stream stopped"};
     case CameraCommandType::open_local_preview:
         throw std::logic_error(
             "main-thread command was sent directly to the command handler");

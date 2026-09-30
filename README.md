@@ -27,11 +27,14 @@ The adapter supports:
 - `take_snapshot(path)`
 - `start_record(path)`
 - `stop_record()`
+- `start_stream(destination, port)`
+- `stop_stream()`
 - `live_view(stop_requested)`
 
 ## Build
 
-Requirements include OpenCV 4 and JsonCpp development packages.
+Requirements include OpenCV 4 with GStreamer support, JsonCpp, and the
+GStreamer OpenH264, RTP, and UDP plugins.
 
 ```bash
 cmake -S . -B build
@@ -69,7 +72,9 @@ The corresponding response is:
 ```
 
 Remote commands are `take_snapshot`, `start_recording`, `stop_recording`,
-`list_media`, and `remove_media`. The latter requires
+`start_stream`, `stop_stream`, `list_media`, and `remove_media`.
+`start_stream` requires `{"arguments":{"udp_port":5000}}`; the destination IP
+is taken from the TCP peer. `remove_media` requires
 `{"arguments":{"filename":"..."}}`. Process shutdown and local preview are
 intentionally available only through the local CLI.
 

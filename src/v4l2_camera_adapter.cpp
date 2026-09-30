@@ -1,8 +1,11 @@
 #include "v4l2_camera_adapter.hpp"
 
+#include <arpa/inet.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgcodecs.hpp>
 
+#include <algorithm>
+#include <sstream>
 #include <stdexcept>
 
 namespace camera_manager {
@@ -33,6 +36,7 @@ V4L2CameraAdapter::~V4L2CameraAdapter() {
 
     std::lock_guard<std::mutex> lock(mutex_);
     recorder_.release();
+    stream_writer_.release();
     camera_.release();
 }
 
@@ -49,6 +53,9 @@ void V4L2CameraAdapter::capture_loop() noexcept {
             frame.copyTo(latest_frame_);
             if (recorder_.isOpened()) {
                 recorder_.write(frame);
+            }
+            if (stream_writer_.isOpened()) {
+                stream_writer_.write(frame);
             }
         }
     } catch (...) {
@@ -107,6 +114,52 @@ void V4L2CameraAdapter::stop_record() {
         throw std::logic_error("no recording is active");
     }
     recorder_.release();
+}
+
+void V4L2CameraAdapter::start_stream(
+    const std::string& destination,
+    std::uint16_t port) {
+    in_addr address{};
+    if (::inet_pton(AF_INET, destination.c_str(), &address) != 1) {
+        throw std::invalid_argument(
+            "stream destination must be an IPv4 address");
+    }
+    if (port == 0) {
+        throw std::invalid_argument("stream port must not be zero");
+    }
+
+    std::lock_guard<std::mutex> lock(mutex_);
+    ensure_running();
+    if (stream_writer_.isOpened()) {
+        throw std::logic_error("a stream is already active");
+    }
+
+    const int gop_size =
+        std::max(1, static_cast<int>(frames_per_second_));
+    std::ostringstream pipeline;
+    pipeline
+        << "appsrc ! queue max-size-buffers=1 leaky=downstream ! "
+        << "videoconvert ! video/x-raw,format=I420 ! "
+        << "openh264enc complexity=low rate-control=bitrate "
+        << "bitrate=2000000 gop-size=" << gop_size << " ! "
+        << "rtph264pay config-interval=1 pt=96 ! "
+        << "udpsink host=" << destination << " port=" << port
+        << " sync=false async=false";
+
+    const cv::Size size(latest_frame_.cols, latest_frame_.rows);
+    if (!stream_writer_.open(
+            pipeline.str(), cv::CAP_GSTREAMER, 0,
+            frames_per_second_, size, true)) {
+        throw std::runtime_error("could not start the RTP video stream");
+    }
+}
+
+void V4L2CameraAdapter::stop_stream() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!stream_writer_.isOpened()) {
+        throw std::logic_error("no stream is active");
+    }
+    stream_writer_.release();
 }
 
 void V4L2CameraAdapter::live_view(
