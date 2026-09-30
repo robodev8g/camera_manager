@@ -22,14 +22,14 @@ CommandResult CommandExecutor::execute_safely(
     }
 }
 
-void CommandExecutor::respond(const CommandResponder& responder,
-                              const CommandResult& result) noexcept {
-    if (!responder) {
+void CommandExecutor::publish_result(const ResultPublisher& publisher,
+                                     const CommandResult& result) noexcept {
+    if (!publisher) {
         return;
     }
 
     try {
-        responder(result);
+        publisher(result);
     } catch (...) {
         // A failed response transport must not stop command execution.
     }
@@ -43,25 +43,27 @@ void CommandExecutor::request_preview(QueuedCommand command) {
             already_open = true;
         } else {
             preview_requested_ = true;
-            preview_responder_ = command.respond;
+            preview_result_publisher_ = command.publish_result;
         }
     }
 
     if (already_open) {
-        respond(command.respond, {"Live view is already open", false});
+        publish_result(
+            command.publish_result, {"Live view is already open", false});
         return;
     }
 
     state_changed_.notify_one();
-    respond(
-        command.respond,
+    publish_result(
+        command.publish_result,
         {"Live view requested; press q or Esc in its window to close it"});
 }
 
-void CommandExecutor::request_shutdown(const CommandResponder& responder) {
+void CommandExecutor::request_shutdown(
+    const ResultPublisher& publish_result) {
     shutdown_requested_.store(true);
     state_changed_.notify_one();
-    respond(responder, {});
+    CommandExecutor::publish_result(publish_result, {});
 }
 
 void CommandExecutor::run() {
@@ -73,11 +75,11 @@ void CommandExecutor::run() {
             request_preview(std::move(queued_command));
             break;
         case CameraCommandType::shutdown:
-            request_shutdown(queued_command.respond);
+            request_shutdown(queued_command.publish_result);
             return;
         default:
-            respond(
-                queued_command.respond,
+            publish_result(
+                queued_command.publish_result,
                 execute_safely(queued_command.command));
             break;
         }
@@ -86,7 +88,7 @@ void CommandExecutor::run() {
 
 void CommandExecutor::run_main_thread() {
     while (true) {
-        CommandResponder preview_responder;
+        ResultPublisher preview_result_publisher;
         {
             std::unique_lock<std::mutex> lock(state_mutex_);
             state_changed_.wait(lock, [this] {
@@ -99,7 +101,8 @@ void CommandExecutor::run_main_thread() {
 
             preview_requested_ = false;
             preview_active_ = true;
-            preview_responder = std::move(preview_responder_);
+            preview_result_publisher =
+                std::move(preview_result_publisher_);
         }
 
         CommandResult preview_result;
@@ -117,7 +120,7 @@ void CommandExecutor::run_main_thread() {
         }
 
         if (!preview_result.message.empty()) {
-            respond(preview_responder, preview_result);
+            publish_result(preview_result_publisher, preview_result);
         }
 
         if (shutdown_requested_.load()) {

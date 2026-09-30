@@ -7,9 +7,14 @@ interface (`ICameraAdapter`) and a V4L2 implementation
 Commands are represented independently of their input transport. Every
 `ICommandSource` pushes commands and response callbacks into the same
 thread-safe FIFO `CommandQueue`. A single `CommandExecutor` consumes that queue,
-so commands from the CLI and future network sources share one ordering point.
+so commands from the CLI and TCP source share one ordering point.
 `CommandHandler` performs the camera and media operations without depending on
 the command transport.
+
+The agent also listens for one persistent TCP controller. TCP commands enter
+the same queue as CLI commands, and responses are routed back to the connection
+that submitted them. Disconnecting the controller does not stop an active
+recording; the agent waits for it to reconnect.
 
 Local live view is the special main-thread operation. The executor changes the
 preview state and notifies the main thread, which owns the OpenCV window loop.
@@ -40,12 +45,33 @@ The default configuration is `config/camera_manager.json`:
 ```json
 {
   "camera_device_index": 0,
-  "media_directory": "media"
+  "media_directory": "media",
+  "control_port": 7000
 }
 ```
 
-Both values are required. Unknown fields and values with the wrong JSON type
+All three values are required. Unknown fields and values with the wrong JSON type
 are rejected.
+
+## TCP control protocol
+
+Each message contains a four-byte unsigned payload length in network byte order,
+followed by a UTF-8 JSON object. A request has this form:
+
+```json
+{"id": 1, "command": "take_snapshot", "arguments": {}}
+```
+
+The corresponding response is:
+
+```json
+{"id": 1, "success": true, "message": "Snapshot saved to ..."}
+```
+
+Remote commands are `take_snapshot`, `start_recording`, `stop_recording`,
+`list_media`, and `remove_media`. The latter requires
+`{"arguments":{"filename":"..."}}`. Process shutdown and local preview are
+intentionally available only through the local CLI.
 
 ## Run
 

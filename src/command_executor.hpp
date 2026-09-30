@@ -20,9 +20,9 @@ public:
 private:
     CommandResult execute_safely(const CameraCommand& command) noexcept;
     void request_preview(QueuedCommand command);
-    void request_shutdown(const CommandResponder& responder);
-    static void respond(const CommandResponder& responder,
-                        const CommandResult& result) noexcept;
+    void request_shutdown(const ResultPublisher& publish_result);
+    static void publish_result(const ResultPublisher& publisher,
+                               const CommandResult& result) noexcept;
 
     CommandHandler& handler_;
     CommandQueue& command_queue_;
@@ -30,7 +30,7 @@ private:
     std::condition_variable state_changed_;
     bool preview_requested_{false};
     bool preview_active_{false};
-    CommandResponder preview_responder_;
+    ResultPublisher preview_result_publisher_;
     std::atomic_bool shutdown_requested_{false};
 };
 

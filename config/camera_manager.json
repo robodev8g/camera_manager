@@ -1,4 +1,5 @@
 {
   "camera_device_index": 0,
-  "media_directory": "/home/user/projects/camera_manager/media"
+  "media_directory": "/home/user/projects/camera_manager/media",
+  "control_port": 7000
 }

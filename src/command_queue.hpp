@@ -9,11 +9,11 @@
 
 namespace camera_manager {
 
-using CommandResponder = std::function<void(const CommandResult&)>;
+using ResultPublisher = std::function<void(const CommandResult&)>;
 
 struct QueuedCommand {
     CameraCommand command;
-    CommandResponder respond;
+    ResultPublisher publish_result;
 };
 
 class CommandQueue {

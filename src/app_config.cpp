@@ -34,9 +34,17 @@ AppConfig load_config(const std::filesystem::path& config_path) {
         root["media_directory"].asString().empty()) {
         throw std::runtime_error("media_directory must be a non-empty string");
     }
+    if (!root.isMember("control_port") ||
+        !root["control_port"].isInt() ||
+        root["control_port"].asInt() < 1 ||
+        root["control_port"].asInt() > 65535) {
+        throw std::runtime_error(
+            "control_port must be an integer from 1 to 65535");
+    }
 
     for (const auto& key : root.getMemberNames()) {
-        if (key != "camera_device_index" && key != "media_directory") {
+        if (key != "camera_device_index" && key != "media_directory" &&
+            key != "control_port") {
             throw std::runtime_error("unknown config key: " + key);
         }
     }
@@ -44,6 +52,7 @@ AppConfig load_config(const std::filesystem::path& config_path) {
     return {
         root["camera_device_index"].asInt(),
         root["media_directory"].asString(),
+        static_cast<std::uint16_t>(root["control_port"].asInt()),
     };
 }
 

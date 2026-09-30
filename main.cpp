@@ -3,6 +3,7 @@
 #include "command_executor.hpp"
 #include "command_handler.hpp"
 #include "command_queue.hpp"
+#include "tcp_command_source.hpp"
 #include "v4l2_camera_adapter.hpp"
 
 #include <exception>
@@ -22,29 +23,44 @@ int main(int argc, char* argv[]) {
             camera, config.media_directory);
         camera_manager::CommandExecutor command_executor(
             command_handler, command_queue);
-        camera_manager::CliCommandSource command_source;
+        camera_manager::CliCommandSource cli_command_source;
+        camera_manager::TcpCommandSource tcp_command_source(
+            config.control_port);
 
-        std::exception_ptr command_source_error;
-        std::thread command_source_thread([&] {
+        std::exception_ptr cli_error;
+        std::thread cli_thread([&] {
             try {
-                command_source.run(command_queue);
+                cli_command_source.run(command_queue);
             } catch (...) {
-                command_source_error = std::current_exception();
+                cli_error = std::current_exception();
                 command_queue.push({
                     {camera_manager::CameraCommandType::shutdown, {}},
                     {},
                 });
             }
         });
+        std::exception_ptr tcp_error;
+        std::thread tcp_thread([&] {
+            try {
+                tcp_command_source.run(command_queue);
+            } catch (...) {
+                tcp_error = std::current_exception();
+            }
+        });
         std::thread command_executor_thread(
             [&] { command_executor.run(); });
 
         command_executor.run_main_thread();
-        command_source_thread.join();
+        tcp_command_source.stop();
+        cli_thread.join();
+        tcp_thread.join();
         command_executor_thread.join();
 
-        if (command_source_error) {
-            std::rethrow_exception(command_source_error);
+        if (cli_error) {
+            std::rethrow_exception(cli_error);
+        }
+        if (tcp_error) {
+            std::rethrow_exception(tcp_error);
         }
     } catch (const std::exception& error) {
         std::cerr << "Error: " << error.what() << '\n';

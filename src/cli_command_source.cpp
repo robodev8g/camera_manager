@@ -2,23 +2,12 @@
 
 #include "command_queue.hpp"
 
-#include <atomic>
-#include <future>
 #include <iostream>
-#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 
 namespace camera_manager {
-namespace {
-
-struct ResponseSignal {
-    std::promise<void> ready;
-    std::atomic_bool received{false};
-};
-
-}  // namespace
 
 void CliCommandSource::print_menu() const {
     std::cout << "\nCamera Manager\n"
@@ -96,20 +85,13 @@ void CliCommandSource::run(CommandQueue& command_queue) {
         const bool shutdown =
             command.type == CameraCommandType::shutdown;
 
-        auto signal = std::make_shared<ResponseSignal>();
-        std::future<void> response_received = signal->ready.get_future();
-
         command_queue.push({
             std::move(command),
-            [this, signal](const CommandResult& result) {
+            [this](const CommandResult& result) {
                 publish_result(result);
-                if (!signal->received.exchange(true)) {
-                    signal->ready.set_value();
-                }
             },
         });
 
-        response_received.wait();
         if (shutdown) {
             return;
         }
