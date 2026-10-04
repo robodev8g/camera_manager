@@ -192,6 +192,7 @@ def main() -> int:
     parser.add_argument("--host", default="127.0.0.1", help="camera agent IP")
     parser.add_argument("--control-port", type=int, default=7000)
     parser.add_argument("--stream-port", type=int, default=5000)
+    parser.add_argument("--client-ip", default=None, help="(optional) local IPv4 to receive UDP stream")
     args = parser.parse_args()
 
     if not 1 <= args.control_port <= 65535:
@@ -205,6 +206,10 @@ def main() -> int:
         args.control_port,
         args.stream_port,
     )
+    # pass client_ip into control messages by attaching to ControlClient send
+    if args.client_ip:
+        # include client_ip into start_stream arguments at the UI level
+        CameraClientWindow._client_ip_override = args.client_ip
     window.show()
     return app.exec()
 

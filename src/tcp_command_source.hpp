@@ -21,7 +21,7 @@ public:
     TcpCommandSource& operator=(TcpCommandSource&&) = delete;
 
     void run(CommandQueue& command_queue) override;
-    void stop() noexcept;
+    void stop() noexcept override;
 
     std::optional<std::string> connected_peer_address() const;
 

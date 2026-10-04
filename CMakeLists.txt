@@ -28,6 +28,16 @@ add_executable(camera-manager
     src/command_handler.cpp
     src/command_queue.cpp
     src/tcp_command_source.cpp
+    src/zmq_command_source.cpp
 )
-target_link_libraries(camera-manager PRIVATE camera-adapter JsonCpp::JsonCpp)
+find_package(PkgConfig)
+pkg_check_modules(PC_LIBZMQ QUIET libzmq)
+if(PC_LIBZMQ_FOUND)
+    message(STATUS "Found libzmq via pkg-config")
+    add_compile_definitions(HAVE_LIBZMQ)
+    include_directories(${PC_LIBZMQ_INCLUDE_DIRS})
+    link_directories(${PC_LIBZMQ_LIBRARY_DIRS})
+endif()
+
+target_link_libraries(camera-manager PRIVATE camera-adapter JsonCpp::JsonCpp ${PC_LIBZMQ_LIBRARIES})
 target_compile_options(camera-manager PRIVATE -Wall -Wextra -Wpedantic)

@@ -42,9 +42,18 @@ AppConfig load_config(const std::filesystem::path& config_path) {
             "control_port must be an integer from 1 to 65535");
     }
 
+    // Optional transport selection
+    if (root.isMember("control_transport") && !root["control_transport"].isString()) {
+        throw std::runtime_error("control_transport must be a string");
+    }
+    if (root.isMember("control_endpoint") && !root["control_endpoint"].isString()) {
+        throw std::runtime_error("control_endpoint must be a string");
+    }
+
     for (const auto& key : root.getMemberNames()) {
         if (key != "camera_device_index" && key != "media_directory" &&
-            key != "control_port") {
+            key != "control_port" && key != "control_transport" &&
+            key != "control_endpoint") {
             throw std::runtime_error("unknown config key: " + key);
         }
     }

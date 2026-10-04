@@ -1,5 +1,7 @@
 {
   "camera_device_index": 0,
   "media_directory": "/home/user/projects/camera_manager/media",
-  "control_port": 7000
+  "control_port": 7000,
+  "control_transport": "zmq",
+  "control_endpoint": "tcp://0.0.0.0:7000"
 }

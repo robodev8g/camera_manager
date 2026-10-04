@@ -135,6 +135,7 @@ CommandResult parse_remote_command(const Json::Value& request,
     const std::string name = request["command"].asString();
     if (name == "take_snapshot") {
         command = {CameraCommandType::take_snapshot, {}};
+    } else if (name == "start_stream") {
     } else if (name == "start_recording") {
         command = {CameraCommandType::start_recording, {}};
     } else if (name == "stop_recording") {
@@ -151,9 +152,13 @@ CommandResult parse_remote_command(const Json::Value& request,
                 false,
             };
         }
+        std::string destination = peer_address;
+        if (arguments.isMember("client_ip") && arguments["client_ip"].isString()) {
+            destination = arguments["client_ip"].asString();
+        }
         command = {
             CameraCommandType::start_stream,
-            peer_address,
+            destination,
             static_cast<std::uint16_t>(arguments["udp_port"].asUInt()),
         };
     } else if (name == "stop_stream") {

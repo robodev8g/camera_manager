@@ -4,12 +4,15 @@
 #include "command_handler.hpp"
 #include "command_queue.hpp"
 #include "tcp_command_source.hpp"
+#include "zmq_command_source.hpp"
 #include "v4l2_camera_adapter.hpp"
 
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <thread>
+#include <json/reader.h>
 
 int main(int argc, char* argv[]) {
     try {
@@ -24,8 +27,38 @@ int main(int argc, char* argv[]) {
         camera_manager::CommandExecutor command_executor(
             command_handler, command_queue);
         camera_manager::CliCommandSource cli_command_source;
-        camera_manager::TcpCommandSource tcp_command_source(
-            config.control_port);
+        // Select control transport. Default to TCP unless config contains
+        // "control_transport": "zmq" and an endpoint in control_endpoint.
+        std::unique_ptr<camera_manager::ICommandSource> control_source;
+        std::string control_transport = "tcp";
+        std::string control_endpoint;
+        try {
+            std::ifstream input(config_path);
+            Json::CharReaderBuilder reader;
+            Json::Value root;
+            std::string errors;
+            Json::parseFromStream(reader, input, &root, &errors);
+            if (root.isMember("control_transport") && root["control_transport"].isString()) {
+                control_transport = root["control_transport"].asString();
+            }
+            if (root.isMember("control_endpoint") && root["control_endpoint"].isString()) {
+                control_endpoint = root["control_endpoint"].asString();
+            }
+        } catch (...) {
+        }
+
+        if (control_transport == "zmq") {
+#ifdef HAVE_LIBZMQ
+            if (control_endpoint.empty()) {
+                control_endpoint = "tcp://127.0.0.1:" + std::to_string(config.control_port);
+            }
+            control_source = std::make_unique<camera_manager::ZmqCommandSource>(control_endpoint);
+#else
+            throw std::runtime_error("ZMQ transport requested but not available at build time");
+#endif
+        } else {
+            control_source = std::make_unique<camera_manager::TcpCommandSource>(config.control_port);
+        }
 
         std::exception_ptr cli_error;
         std::thread cli_thread([&] {
@@ -42,7 +75,7 @@ int main(int argc, char* argv[]) {
         std::exception_ptr tcp_error;
         std::thread tcp_thread([&] {
             try {
-                tcp_command_source.run(command_queue);
+                control_source->run(command_queue);
             } catch (...) {
                 tcp_error = std::current_exception();
             }
@@ -51,7 +84,7 @@ int main(int argc, char* argv[]) {
             [&] { command_executor.run(); });
 
         command_executor.run_main_thread();
-        tcp_command_source.stop();
+        control_source->stop();
         cli_thread.join();
         tcp_thread.join();
         command_executor_thread.join();
