@@ -7,3 +7,5 @@ media/
 *.png
 *.jpg
 *.jpeg
+.venv/
+.vscode/

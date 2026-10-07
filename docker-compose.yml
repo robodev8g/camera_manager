@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  camera-client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      DISPLAY: ${DISPLAY:-:99}
+      QT_QPA_PLATFORM: xcb
+      CAMERA_HOST: ${CAMERA_HOST:-127.0.0.1}
+      CONTROL_PORT: ${CONTROL_PORT:-7000}
+      STREAM_PORT: ${STREAM_PORT:-5000}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command:
+      - --host
+      - ${CAMERA_HOST:-127.0.0.1}
+      - --control-port
+      - ${CONTROL_PORT:-7000}
+      - --stream-port
+      - ${STREAM_PORT:-5000}

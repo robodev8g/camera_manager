@@ -21,17 +21,26 @@ class ControlClient(QThread):
     response_received = Signal(dict)
     error = Signal(str)
 
-    def __init__(self, host: str, port: int) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        client_ip: str | None = None,
+        transport: str = "zmq",
+        zmq_endpoint: str | None = None,
+    ) -> None:
         super().__init__()
         self._host = host
         self._port = port
+        self._client_ip = client_ip
+        self._transport = transport.lower()
+        self._zmq_endpoint = zmq_endpoint
         self._commands: queue.Queue[dict[str, Any] | None] = queue.Queue()
         self._next_request_id = 1
         self._stopping = threading.Event()
         self._socket_lock = threading.Lock()
         self._socket: socket.socket | None = None
         self._use_zmq = False
-        self._zmq_endpoint: str | None = None
 
     def send_command(
         self,
@@ -45,25 +54,39 @@ class ControlClient(QThread):
             "id": request_id,
             "command": command,
         }
-        # Ensure start_stream includes a client_ip so server can send UDP stream
+        # Ensure start_stream includes a valid client_ip so the camera agent sends
+        # the RTP/UDP stream to the correct interface instead of loopback.
         if command == "start_stream":
             if arguments is None:
                 arguments = {}
             if "client_ip" not in arguments:
-                # Determine outbound IP used to reach the control host
-                try:
-                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-                    # doesn't send packets; used to determine local IP
-                    sock.connect((self._host, self._port))
-                    local_ip = sock.getsockname()[0]
-                    sock.close()
-                except Exception:
-                    local_ip = self._host
-                arguments["client_ip"] = local_ip
+                client_ip = self._client_ip or self._detect_client_ip()
+                arguments["client_ip"] = client_ip
         if arguments:
             request["arguments"] = arguments
         self._commands.put(request)
         return request_id
+
+    def _detect_client_ip(self) -> str:
+        try:
+            if self._host and self._host != "127.0.0.1" and self._host != "localhost":
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                sock.connect((self._host, self._port))
+                local_ip = sock.getsockname()[0]
+                sock.close()
+                if local_ip and local_ip != "127.0.0.1":
+                    return local_ip
+        except Exception:
+            pass
+
+        try:
+            host_ip = socket.gethostbyname(socket.gethostname())
+            if host_ip and host_ip != "127.0.0.1":
+                return host_ip
+        except Exception:
+            pass
+
+        return self._host if self._host and self._host != "localhost" else "127.0.0.1"
 
     def stop_when_idle(self) -> None:
         self._commands.put(None)
@@ -79,18 +102,20 @@ class ControlClient(QThread):
                     pass
 
     def run(self) -> None:
-        # If a ZMQ endpoint is provided via env var, prefer ZMQ
-        zmq_endpoint = os.environ.get("CAMERA_CONTROL_ZMQ_ENDPOINT")
-        if zmq and zmq_endpoint:
-            zmq_endpoint = zmq_endpoint.strip()
-            # Accept bare host:port and prepend tcp://
-            if not (zmq_endpoint.startswith("tcp://") or zmq_endpoint.startswith("ipc://")):
-                if ":" in zmq_endpoint:
-                    zmq_endpoint = "tcp://" + zmq_endpoint
-            # Validate tcp endpoint: tcp://<host>:<port> or bare host:port
-            normalized = zmq_endpoint
-            if normalized.startswith("tcp://"):
-                normalized = normalized[len("tcp://"):]
+        zmq_endpoint = self._zmq_endpoint or os.environ.get("CAMERA_CONTROL_ZMQ_ENDPOINT")
+        if self._transport == "zmq" or (self._transport != "tcp" and zmq_endpoint):
+            if not zmq_endpoint:
+                zmq_endpoint = f"tcp://{self._host}:{self._port}"
+            if zmq and zmq_endpoint:
+                zmq_endpoint = zmq_endpoint.strip()
+                # Accept bare host:port and prepend tcp://
+                if not (zmq_endpoint.startswith("tcp://") or zmq_endpoint.startswith("ipc://")):
+                    if ":" in zmq_endpoint:
+                        zmq_endpoint = "tcp://" + zmq_endpoint
+                # Validate tcp endpoint: tcp://<host>:<port> or bare host:port
+                normalized = zmq_endpoint
+                if normalized.startswith("tcp://"):
+                    normalized = normalized[len("tcp://"):]
 
             # split host:port (port may include trailing garbage if malformed)
             if ":" not in normalized:

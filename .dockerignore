@@ -1,0 +1,12 @@
+.git
+.gitignore
+.vscode/
+.idea/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+build/
+cmake-build-debug/
+media/
+.DS_Store

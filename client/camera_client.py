@@ -24,6 +24,9 @@ class CameraClientWindow(QMainWindow):
         host: str,
         control_port: int,
         stream_port: int,
+        client_ip: str | None = None,
+        control_transport: str = "zmq",
+        control_endpoint: str | None = None,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Camera Manager")
@@ -56,7 +59,13 @@ class CameraClientWindow(QMainWindow):
         self.setCentralWidget(container)
         self.resize(960, 620)
 
-        self._control = ControlClient(host, control_port)
+        self._control = ControlClient(
+            host,
+            control_port,
+            client_ip=client_ip,
+            transport=control_transport,
+            zmq_endpoint=control_endpoint,
+        )
         self._control.connected.connect(self._on_connected)
         self._control.disconnected.connect(self._on_disconnected)
         self._control.response_received.connect(self._on_response)
@@ -193,6 +202,17 @@ def main() -> int:
     parser.add_argument("--control-port", type=int, default=7000)
     parser.add_argument("--stream-port", type=int, default=5000)
     parser.add_argument("--client-ip", default=None, help="(optional) local IPv4 to receive UDP stream")
+    parser.add_argument(
+        "--control-transport",
+        choices=["tcp", "zmq"],
+        default="zmq",
+        help="control transport used by the camera agent",
+    )
+    parser.add_argument(
+        "--control-endpoint",
+        default=None,
+        help="override ZMQ endpoint (for example tcp://127.0.0.1:7000)",
+    )
     args = parser.parse_args()
 
     if not 1 <= args.control_port <= 65535:
@@ -205,11 +225,10 @@ def main() -> int:
         args.host,
         args.control_port,
         args.stream_port,
+        client_ip=args.client_ip,
+        control_transport=args.control_transport,
+        control_endpoint=args.control_endpoint,
     )
-    # pass client_ip into control messages by attaching to ControlClient send
-    if args.client_ip:
-        # include client_ip into start_stream arguments at the UI level
-        CameraClientWindow._client_ip_override = args.client_ip
     window.show()
     return app.exec()
 

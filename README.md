@@ -78,6 +78,38 @@ is taken from the TCP peer. `remove_media` requires
 `{"arguments":{"filename":"..."}}`. Process shutdown and local preview are
 intentionally available only through the local CLI.
 
+## Docker
+
+A Docker image is provided for the Python GUI client. It includes the Qt and
+GStreamer runtime dependencies needed by `client/camera_client.py`.
+
+Build:
+
+```bash
+docker build -t camera-manager-client .
+```
+
+Run in a Linux desktop environment with X11 forwarding:
+
+```bash
+xhost +si:localuser:root
+sudo docker run --rm -it \
+  --network host \
+  -e DISPLAY=$DISPLAY \
+  -v /tmp/.X11-unix:/tmp/.X11-unix \
+  camera-manager-client --host 192.168.1.50
+```
+
+Alternatively, you can run the GUI inside a virtual display if a local desktop is
+not available:
+
+```bash
+docker run --rm -it --network host camera-manager-client --host 192.168.1.50
+```
+
+The image starts the client with `xvfb-run`, so the app can launch even without a
+real display attached.
+
 ## Run
 
 ```bash
